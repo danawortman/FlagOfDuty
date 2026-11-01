@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flag of Duty</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Flag of Duty</h1>
+      <div class="scoreboard" aria-label="Score">
+        <span class="team-tag blue">Blue</span>
+        <output id="score-blue" data-testid="score-blue">0</output>
+        <span class="dash">:</span>
+        <output id="score-red" data-testid="score-red">0</output>
+        <span class="team-tag red">Red</span>
+      </div>
+      <output class="clock" data-testid="clock">3:00</output>
+    </header>
+
+    <main class="layout">
+      <section class="stage">
+        <div class="arena-frame">
+          <canvas id="arena" data-testid="arena" width="1536" height="816"></canvas>
+        </div>
+
+        <div class="controls">
+          <button type="button" class="primary" data-testid="play">Play</button>
+          <button type="button" data-testid="step">Step</button>
+          <button type="button" data-testid="restart">Restart</button>
+          <label>Seed
+            <input type="number" data-testid="seed" min="0" step="1" />
+          </label>
+          <output class="tick" data-testid="tick">tick 0</output>
+        </div>
+
+        <div class="squads">
+          <section class="squad blue" data-testid="squad-blue"><h2>Blue squad</h2></section>
+          <section class="squad red" data-testid="squad-red"><h2>Red squad</h2></section>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/ui/main.ts"></script>
+  </body>
+</html>
