@@ -28,7 +28,7 @@ Then open http://localhost:5199.
 |---|---|
 | `npm test` | Unit tests for the simulation (no browser) |
 | `npm run test:e2e` | Playwright behaviour and screenshot tests |
-| `npm run test:e2e:update` | Accept new screenshot baselines after an intended visual change |
+| `npm run test:e2e:update` | Generate screenshot baselines, or accept an intended visual change |
 | `npm run typecheck` | TypeScript check |
 | `npm run build` | Production build into `dist/` |
 | `npm run tournament -- 100` | Round-robin of every brain, 100 seeds per pairing |
@@ -56,9 +56,9 @@ Any exact moment can be loaded from the URL, which keeps screenshots determinist
 Playwright starts its own server on port 5198 and never reuses one, so a dev server left
 open elsewhere cannot be tested by mistake. It fails if that port is busy.
 
-Screenshot baselines are per platform under `tests/e2e/__screenshots__/`, because text
-renders differently on each OS. On a new platform, generate its set with
-`npm run test:e2e:update` and review the images first.
+Screenshot baselines are not included, because text renders differently on each OS. Generate
+them with `npm run test:e2e:update` before the first `npm run test:e2e`, and review the images.
+They are written to `tests/e2e/__screenshots__/`, in a folder for each platform.
 
 The comparison is strict (`threshold: 0.02`), so small colour changes fail it.
 
