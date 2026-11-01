@@ -23,6 +23,7 @@
       <section class="stage">
         <div class="arena-frame">
           <canvas id="arena" data-testid="arena" width="1536" height="816"></canvas>
+          <div class="countdown" data-testid="countdown" hidden></div>
         </div>
 
         <div class="controls">
@@ -32,6 +33,7 @@
           <label>Seed
             <input type="number" data-testid="seed" min="0" step="1" />
           </label>
+          <output class="arena-name" data-testid="arena-name"></output>
           <output class="tick" data-testid="tick">tick 0</output>
         </div>
 

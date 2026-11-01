@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { brainById } from '../../src/sim/brains';
+import { nextSeed } from '../../src/sim/rng';
+import { ARENAS } from '../../src/sim/arenas';
+import { arenaForSeed } from '../../src/sim/map';
 import { createWorld, stateHash, stepWorld } from '../../src/sim/world';
 
 // A fixed match, reproducible in the browser and in Node.
@@ -73,12 +76,55 @@ test.describe('behaviour', () => {
     await expect(id(page, 'state-blue-0')).toHaveText('Patrol');
   });
 
-  test('a finished match shows the result and stays stopped', async ({ page }) => {
-    await open(page, 'seed=2&blue=picket,picket,picket&red=rusher,rusher,rusher');
-    await page.evaluate(() => window.flagOfDuty.advance(1800));
-    await expect(id(page, 'tick')).toHaveText(/^Blue wins \d : \d$/);
+  test('counts down before kick-off', async ({ page }) => {
+    await open(page);
     await id(page, 'play').click();
-    await expect(id(page, 'play')).toHaveText('Play');
+    await expect(id(page, 'countdown')).toHaveText(/^Kick-off in [123]$/);
+    await expect(id(page, 'tick')).toHaveText('tick 0');
+    await expect(id(page, 'countdown')).toBeHidden({ timeout: 5000 });
+    await page.waitForFunction(() => window.flagOfDuty.tick() > 0);
+  });
+
+  test('pausing during the countdown stops kick-off', async ({ page }) => {
+    await open(page);
+    await id(page, 'play').click();
+    await expect(id(page, 'countdown')).toBeVisible();
+    await id(page, 'play').click();
+    await expect(id(page, 'countdown')).toBeHidden();
+    await page.waitForTimeout(3300);
+    await expect(id(page, 'tick')).toHaveText('tick 0');
+  });
+
+  test('a finished match shows its result, then the next match starts on a new seed', async ({ page }) => {
+    await open(page, 'seed=2&blue=sentry,sentry,sentry&red=sentry,sentry,sentry');
+    await page.evaluate(() => window.flagOfDuty.advance(1799));
+    await id(page, 'play').click();
+    await expect(id(page, 'tick')).toHaveText('Draw');
+    await expect(id(page, 'countdown')).toHaveText(/^Next match in [123]$/);
+    await expect(id(page, 'play')).toHaveText('Pause');
+
+    const seed = nextSeed(2);
+    await expect(id(page, 'seed')).toHaveValue(String(seed), { timeout: 5000 });
+    await expect(id(page, 'arena-name')).toHaveText(ARENAS[arenaForSeed(seed)].name);
+    await page.waitForFunction(() => window.flagOfDuty.tick() > 0);
+    await expect(id(page, 'play')).toHaveText('Pause');
+  });
+
+  test('restart stops the run of matches', async ({ page }) => {
+    await open(page, 'seed=2&blue=sentry,sentry,sentry&red=sentry,sentry,sentry');
+    await page.evaluate(() => window.flagOfDuty.advance(1799));
+    await id(page, 'play').click();
+    await expect(id(page, 'countdown')).toBeVisible();
+    await id(page, 'restart').click();
+    await expect(id(page, 'countdown')).toBeHidden();
+    await page.waitForTimeout(3300);
+    await expect(id(page, 'seed')).toHaveValue('2');
+    await expect(id(page, 'tick')).toHaveText('tick 0');
+  });
+
+  test('shows which arena the seed drew', async ({ page }) => {
+    await open(page);
+    await expect(id(page, 'arena-name')).toHaveText(ARENAS[arenaForSeed(7)].name);
   });
 
   test('shows each agent\'s active state', async ({ page }) => {
@@ -102,6 +148,13 @@ test.describe('visual', () => {
     await open(page);
     await expect(id(page, 'arena')).toHaveScreenshot('arena-kickoff.png');
   });
+
+  for (const [index, arena] of ARENAS.entries()) {
+    test(`arena layout: ${arena.name}`, async ({ page }) => {
+      await open(page, `${MATCH}&arena=${index}`);
+      await expect(id(page, 'arena')).toHaveScreenshot(`arena-layout-${index}.png`);
+    });
+  }
 
   test('arena mid-match', async ({ page }) => {
     await open(page, `${MATCH}&tick=240`);

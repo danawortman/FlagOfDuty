@@ -7,3 +7,8 @@ export function nextRandom(state: number): { state: number; value: number } {
   t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
   return { state: s, value: (t ^ (t >>> 14)) >>> 0 };
 }
+
+// The seed for the match after this one, so a run of matches is reproducible too.
+export function nextSeed(seed: number): number {
+  return nextRandom(seed).value % 1_000_000;
+}

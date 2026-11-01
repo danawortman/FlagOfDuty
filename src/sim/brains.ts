@@ -22,6 +22,7 @@ const flagHome = is('ourFlagHome', '==', 1);
 const flagTaken = is('ourFlagTaken', '==', 1);
 const flagDropped = is('ourFlagDropped', '==', 1);
 const inEnemyHalf = is('inOwnHalf', '==', 0);
+const inOwnHalf = is('inOwnHalf', '==', 1);
 const seesEnemy = is('enemyVisible', '==', 1);
 const seesNoEnemy = is('enemyVisible', '==', 0);
 const enemyWithin = (tiles: number): ConditionRow => is('nearestEnemyDist', '<=', tiles);
@@ -123,7 +124,60 @@ const raider: Brain = {
   ),
 };
 
-export const BRAINS: Brain[] = [rusher, sentry, picket, raider];
+// Stays on the flag and only leaves it to meet an enemy who gets close.
+const goalkeeper: Brain = {
+  id: 'goalkeeper',
+  name: 'Goalkeeper',
+  ...machine(
+    'guard',
+    [
+      state('guard', 'Guard', 'goHome'),
+      state('stand', 'Stand', 'hold'),
+      state('block', 'Block', 'chaseIntruder'),
+      state('recover', 'Recover', 'goOurFlag'),
+    ],
+    [
+      ['guard', 'recover', any(flagTaken, flagDropped)],
+      ['guard', 'block', all(is('nearestIntruderDist', '<=', 6))],
+      ['guard', 'stand', all(after(30))],
+      ['stand', 'recover', any(flagTaken, flagDropped)],
+      ['stand', 'block', all(is('nearestIntruderDist', '<=', 6))],
+      ['block', 'recover', any(flagTaken, flagDropped)],
+      ['block', 'guard', all(is('nearestIntruderDist', '>', 9))],
+      ['recover', 'guard', all(flagHome)],
+    ],
+  ),
+};
+
+// Lurks in the midfield and slips past while the enemy is busy attacking.
+const shadow: Brain = {
+  id: 'shadow',
+  name: 'Shadow',
+  ...machine(
+    'lurk',
+    [
+      state('lurk', 'Lurk', 'patrolMidfield'),
+      state('sneak', 'Sneak', 'goEnemyFlag'),
+      state('dodge', 'Dodge', 'flee'),
+      state('slip', 'Slip Home', 'goHome'),
+      state('duck', 'Duck', 'flee'),
+    ],
+    [
+      ['lurk', 'sneak', any(is('intruderCount', '>=', 1), after(90))],
+      ['sneak', 'slip', all(carrying)],
+      ['sneak', 'dodge', all(inEnemyHalf, seesEnemy, enemyWithin(3))],
+      ['sneak', 'lurk', all(inOwnHalf, is('intruderCount', '==', 0), after(120))],
+      ['dodge', 'slip', all(carrying)],
+      ['dodge', 'sneak', any(after(8), seesNoEnemy)],
+      ['slip', 'lurk', all(notCarrying)],
+      ['slip', 'duck', all(inEnemyHalf, seesEnemy, enemyWithin(3))],
+      ['duck', 'lurk', all(notCarrying)],
+      ['duck', 'slip', any(after(6), seesNoEnemy)],
+    ],
+  ),
+};
+
+export const BRAINS: Brain[] = [rusher, sentry, picket, raider, goalkeeper, shadow];
 
 export function brainById(id: string): Brain {
   const brain = BRAINS.find((b) => b.id === id);

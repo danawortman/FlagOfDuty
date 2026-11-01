@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { BRAINS, brainById } from '../../src/sim/brains';
 import { validateBrain } from '../../src/sim/fsm';
-import { createArena, hasLineOfSight, inHalf, isWall, mirrorX } from '../../src/sim/map';
-import { pathDistance, UNREACHABLE } from '../../src/sim/path';
+import { ARENAS } from '../../src/sim/arenas';
+import { arenaForSeed, createArena, hasLineOfSight, inHalf, isWall, mirrorX, tileCost } from '../../src/sim/map';
+import { pathDistance, stepToward, UNREACHABLE } from '../../src/sim/path';
+import { nextSeed } from '../../src/sim/rng';
 import {
   CAPTURES_TO_WIN,
   FLAG_RETURN_TICKS,
   MATCH_TICKS,
+  MOVE_PERIOD,
+  MUD_COST,
   RESPAWN_TICKS,
   TAG_RECHARGE_TICKS,
 } from '../../src/sim/rules';
@@ -23,7 +27,7 @@ const idle: Brain = {
 };
 
 function idleWorld(): World {
-  const world = createWorld({ seed: 1, blue: [idle, idle, idle], red: [idle, idle, idle] });
+  const world = createWorld({ seed: 1, arena: 0, blue: [idle, idle, idle], red: [idle, idle, idle] });
   world.agents.forEach((a) => (a.moveCooldown = 0));
   return world;
 }
@@ -36,14 +40,17 @@ function place(agent: Agent, tile: Tile): void {
 const blue = (w: World, i = 0) => w.agents[i];
 const red = (w: World, i = 0) => w.agents[3 + i];
 
-describe('arena', () => {
-  const map = createArena();
+describe.each(ARENAS.map((arena, i) => [arena.name, i] as const))('arena %s', (_name, index) => {
+  const map = createArena(index);
 
   it('is mirror-symmetric left to right and top to bottom', () => {
     for (let y = 0; y < map.height; y++) {
       for (let x = 0; x < map.width; x++) {
+        const mud = (tx: number, ty: number) => tileCost(map, { x: tx, y: ty });
         expect(isWall(map, x, y)).toBe(isWall(map, map.width - 1 - x, y));
         expect(isWall(map, x, y)).toBe(isWall(map, x, map.height - 1 - y));
+        expect(mud(x, y)).toBe(mud(map.width - 1 - x, y));
+        expect(mud(x, y)).toBe(mud(x, map.height - 1 - y));
       }
     }
   });
@@ -58,17 +65,16 @@ describe('arena', () => {
     }
   });
 
-  it('places every waypoint and spawn on floor, mirrored for red', () => {
-    const tiles = [
-      ...map.spawns.blue,
-      ...map.basePatrol.blue,
-      ...map.midfieldPatrol.blue,
-      map.flank.blue,
-    ];
+  it('places every waypoint and spawn on open ground, mirrored for red', () => {
+    const tiles = [...map.spawns.blue, ...map.basePatrol.blue, ...map.midfieldPatrol.blue, map.flank.blue];
     for (const t of tiles) expect(isWall(map, t.x, t.y)).toBe(false);
     expect(map.flagHome.red).toEqual(mirrorX(map.width, map.flagHome.blue));
     expect(map.spawns.blue).toHaveLength(3);
   });
+});
+
+describe('line of sight', () => {
+  const map = createArena(0);
 
   it('has symmetric line of sight, blocked by walls', () => {
     const a = { x: 3, y: 3 };
@@ -76,6 +82,77 @@ describe('arena', () => {
     expect(hasLineOfSight(map, a, b)).toBe(hasLineOfSight(map, b, a));
     expect(hasLineOfSight(map, { x: 8, y: 2 }, { x: 13, y: 2 })).toBe(false); // wall at x=10
     expect(hasLineOfSight(map, { x: 1, y: 1 }, { x: 14, y: 1 })).toBe(true);
+  });
+});
+
+describe('arena selection', () => {
+  it('always picks the same arena for a seed', () => {
+    for (let seed = 1; seed <= 50; seed++) expect(arenaForSeed(seed)).toBe(arenaForSeed(seed));
+  });
+
+  it('reaches every arena', () => {
+    const seen = new Set(Array.from({ length: 50 }, (_, seed) => arenaForSeed(seed)));
+    expect(seen.size).toBe(ARENAS.length);
+  });
+
+  it('uses the arena for its seed unless one is given', () => {
+    const seed = 11;
+    const setup = { seed, blue: [idle, idle, idle], red: [idle, idle, idle] };
+    expect(createWorld(setup).map.name).toBe(ARENAS[arenaForSeed(seed)].name);
+    expect(createWorld({ ...setup, arena: 2 }).map.name).toBe(ARENAS[2].name);
+  });
+
+  it('gives a repeatable run of seeds', () => {
+    const run = (start: number) => [nextSeed(start), nextSeed(nextSeed(start))];
+    expect(run(7)).toEqual(run(7));
+    expect(nextSeed(7)).not.toBe(7);
+  });
+});
+
+describe('mud', () => {
+  const bog = createArena(1);
+  const mudTile = { x: 12, y: 2 };
+
+  it('costs more to cross than open ground', () => {
+    expect(tileCost(bog, mudTile)).toBe(MUD_COST);
+    expect(tileCost(bog, { x: 3, y: 3 })).toBe(1);
+  });
+
+  it('slows an agent stepping onto it', () => {
+    const w = createWorld({ seed: 1, arena: 1, blue: [brainById('rusher'), idle, idle], red: [idle, idle, idle] });
+    const a = w.agents[0];
+    place(a, { x: 9, y: 2 });
+    a.moveCooldown = 0;
+    w.flags.red.pos = { x: 10, y: 2 }; // the rusher's next step is into the mud
+    stepWorld(w);
+    expect(a.pos).toEqual({ x: 10, y: 2 });
+    expect(a.movePeriod).toBe(MOVE_PERIOD * MUD_COST);
+    expect(a.moveCooldown).toBe(MOVE_PERIOD * MUD_COST - 1);
+  });
+
+  it('is walked around when a dry route is quicker', () => {
+    const map = createArena(0);
+    for (const x of [4, 5, 6]) map.mud[map.width + x] = true; // on row 1, with row 2 dry
+    const target = { x: 8, y: 1 };
+    let at = { x: 3, y: 1 };
+    const path = [];
+    while (at.x !== target.x || at.y !== target.y) {
+      at = stepToward(map, at, target, 'blue')!;
+      path.push(at);
+      expect(path.length).toBeLessThan(12);
+    }
+    expect(path.filter((t) => tileCost(map, t) > 1)).toEqual([]);
+  });
+
+  it('is crossed when going around would take longer', () => {
+    const map = createArena(0);
+    map.mud[map.width + 5] = true;
+    expect(stepToward(map, { x: 4, y: 1 }, { x: 8, y: 1 }, 'blue')).toEqual({ x: 5, y: 1 });
+  });
+
+  it('counts mud in path distance', () => {
+    expect(pathDistance(bog, { x: 13, y: 2 }, mudTile)).toBe(MUD_COST);
+    expect(pathDistance(bog, mudTile, { x: 13, y: 2 })).toBe(1 + (bog.mud[2 * bog.width + 13] ? 1 : 0));
   });
 });
 
@@ -146,7 +223,7 @@ describe('tagging', () => {
   });
 
   it('restarts the brain when the agent comes back', () => {
-    const w = createWorld({ seed: 1, blue: [idle, idle, idle], red: Array(3).fill(brainById('raider')) });
+    const w = createWorld({ seed: 1, arena: 0, blue: [idle, idle, idle], red: Array(3).fill(brainById('raider')) });
     place(blue(w), { x: 8, y: 8 });
     place(red(w), { x: 9, y: 8 });
     red(w).runtime.state = 'runHome';
@@ -297,7 +374,7 @@ describe('brains', () => {
     const wins = (a: string, b: string): number => {
       let total = 0;
       for (let seed = 1; seed <= 20; seed++) {
-        const w = runToEnd(createWorld({ seed, blue: Array(3).fill(brainById(a)), red: Array(3).fill(brainById(b)) }));
+        const w = runToEnd(createWorld({ seed, arena: 0, blue: Array(3).fill(brainById(a)), red: Array(3).fill(brainById(b)) }));
         if (w.winner === 'blue') total++;
         else if (w.winner === 'red') total--;
       }

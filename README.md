@@ -21,6 +21,9 @@ Then open http://localhost:5199.
 - Standing in your own half next to an enemy who is also in your half tags them. They drop
   any flag and respawn after 4 seconds. Each tag costs the tagger a 5 second recharge.
 - A dropped flag goes home when its own team touches it, or after 10 seconds.
+- Mud takes twice as long to cross, and agents path around it when that is quicker.
+- Each match draws one of four arenas from its seed. After a countdown, matches keep
+  running with a new seed until you pause or restart.
 
 ## Commands
 
@@ -38,7 +41,8 @@ Then open http://localhost:5199.
 - `src/sim/`: the game, with no browser code. Integer-only, seeded and deterministic.
   - `types.ts`: includes the brain JSON format.
   - `fsm.ts`: the state-machine interpreter and data check. Its semantics are at the top of the file.
-  - `brains.ts`: the four brains.
+  - `brains.ts`: the six brains.
+  - `arenas.ts`: the four arena layouts.
   - `sensors.ts`, `actions.ts`: what conditions can read and what states can do.
   - `rules.ts`: every tuning number.
 - `src/ui/`: canvas renderer, squad panels and the `window.flagOfDuty` test hook.
@@ -50,7 +54,7 @@ Then open http://localhost:5199.
 Any exact moment can be loaded from the URL, which keeps screenshots deterministic:
 
 ```
-/?seed=7&blue=raider,rusher,sentry&red=picket,rusher,sentry&tick=240
+/?seed=7&blue=raider,rusher,sentry&red=picket,rusher,sentry&tick=240&arena=1
 ```
 
 Playwright starts its own server on port 5198 and never reuses one, so a dev server left

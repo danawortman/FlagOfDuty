@@ -1,5 +1,4 @@
 import { isWall } from '../sim/map';
-import { MOVE_PERIOD } from '../sim/rules';
 import { TEAMS, type Agent, type Team, type Tile, type World } from '../sim/types';
 
 export const TILE = 48;
@@ -8,6 +7,7 @@ const COLORS = {
   floorBlue: '#1c2735',
   floorRed: '#2f2125',
   wall: '#3f4a5b',
+  mud: '#5a4a32',
   blue: '#4c9bff',
   red: '#ff6b5e',
   outline: '#0d1117',
@@ -20,6 +20,7 @@ function drawArena(ctx: CanvasRenderingContext2D, world: World): void {
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
       if (isWall(map, x, y)) ctx.fillStyle = COLORS.wall;
+      else if (map.mud[y * map.width + x]) ctx.fillStyle = COLORS.mud;
       else ctx.fillStyle = x < map.width / 2 ? COLORS.floorBlue : COLORS.floorRed;
       ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
     }
@@ -55,8 +56,8 @@ function drawFlagGlyph(ctx: CanvasRenderingContext2D, team: Team, x: number, y: 
 }
 
 function agentPosition(agent: Agent, alpha: number): Tile {
-  const { prev, pos, moveCooldown } = agent;
-  const t = Math.min(1, (MOVE_PERIOD - moveCooldown - 1 + alpha) / MOVE_PERIOD);
+  const { prev, pos, moveCooldown, movePeriod } = agent;
+  const t = Math.min(1, (movePeriod - moveCooldown - 1 + alpha) / movePeriod);
   return { x: prev.x + (pos.x - prev.x) * t, y: prev.y + (pos.y - prev.y) * t };
 }
 

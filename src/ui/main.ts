@@ -1,16 +1,18 @@
 import { BRAINS, brainById } from '../sim/brains';
 import { activeState } from '../sim/fsm';
+import { nextSeed } from '../sim/rng';
 import { MATCH_TICKS, SQUAD_SIZE, TICKS_PER_SECOND } from '../sim/rules';
 import { TEAMS, type Team, type World } from '../sim/types';
 import { createWorld, stateHash, stepWorld } from '../sim/world';
 import { renderWorld } from './render';
 
 // URL parameters make any moment reproducible, which is what the screenshot tests
-// rely on: ?seed=7&blue=rusher,sentry,raider&red=picket,picket,picket&tick=240
+// rely on: ?seed=7&blue=rusher,sentry,raider&red=picket,picket,picket&tick=240&arena=1
 const params = new URLSearchParams(location.search);
+const COUNTDOWN_SECONDS = 3;
 const DEFAULTS: Record<Team, string[]> = {
   blue: ['raider', 'rusher', 'sentry'],
-  red: ['picket', 'rusher', 'sentry'],
+  red: ['picket', 'shadow', 'goalkeeper'],
 };
 
 function squadFromUrl(team: Team): string[] {
@@ -24,11 +26,13 @@ const canvas = byTestId<HTMLCanvasElement>('arena');
 const ctx = canvas.getContext('2d')!;
 const playButton = byTestId<HTMLButtonElement>('play');
 const seedInput = byTestId<HTMLInputElement>('seed');
+const countdownEl = byTestId('countdown');
 
 const squads: Record<Team, string[]> = { blue: squadFromUrl('blue'), red: squadFromUrl('red') };
 let seed = Number(params.get('seed') ?? 1) | 0;
 let world!: World;
 let running = false;
+let countdown = 0; // seconds left before kick-off; 0 when not counting
 let carry = 0; // fraction of a tick accumulated between frames
 let lastFrame = 0;
 const slotStates = new Map<number, HTMLElement>();
@@ -38,6 +42,7 @@ function newMatch(): void {
     seed,
     blue: squads.blue.map(brainById),
     red: squads.red.map(brainById),
+    arena: params.has('arena') ? Number(params.get('arena')) : undefined,
   });
   carry = 0;
   setRunning(false);
@@ -47,8 +52,31 @@ function newMatch(): void {
 
 function setRunning(on: boolean): void {
   running = on && !world.winner;
+  countdown = 0;
   playButton.textContent = running ? 'Pause' : 'Play';
   lastFrame = performance.now();
+}
+
+function startCountdown(): void {
+  running = false;
+  countdown = COUNTDOWN_SECONDS;
+  playButton.textContent = 'Pause';
+}
+
+// A finished match rolls straight into the next one, until the player stops it.
+function kickOff(): void {
+  if (world.winner) {
+    seed = nextSeed(seed);
+    newMatch();
+  }
+  setRunning(true);
+}
+
+function showCountdown(): void {
+  countdownEl.hidden = countdown === 0;
+  if (countdown > 0) {
+    countdownEl.textContent = `${world.winner ? 'Next match' : 'Kick-off'} in ${Math.ceil(countdown)}`;
+  }
 }
 
 function advance(ticks: number): void {
@@ -70,6 +98,7 @@ function refresh(): void {
   byTestId('score-red').textContent = String(world.score.red);
   byTestId('clock').textContent = clockText(world.tick);
   byTestId('tick').textContent = world.winner ? resultText() : `tick ${world.tick}`;
+  byTestId('arena-name').textContent = world.map.name;
 
   for (const agent of world.agents) {
     const el = slotStates.get(agent.id)!;
@@ -113,6 +142,10 @@ function buildSquadPanels(): void {
 function frame(now: number): void {
   const dt = Math.min(now - lastFrame, 250);
   lastFrame = now;
+  if (countdown > 0) {
+    countdown = Math.max(0, countdown - dt / 1000);
+    if (countdown === 0) kickOff();
+  }
   if (running) {
     carry += (dt / 1000) * TICKS_PER_SECOND;
     const whole = Math.floor(carry);
@@ -120,14 +153,19 @@ function frame(now: number): void {
       carry -= whole;
       advance(whole);
       refresh();
-      if (world.winner) setRunning(false);
+      if (world.winner) startCountdown();
     }
   }
   renderWorld(ctx, world, running ? carry : 0);
+  showCountdown();
   requestAnimationFrame(frame);
 }
 
-playButton.addEventListener('click', () => setRunning(!running));
+playButton.addEventListener('click', () => {
+  if (running || countdown > 0) setRunning(false);
+  else if (world.tick === 0 || world.winner) startCountdown();
+  else setRunning(true);
+});
 byTestId('step').addEventListener('click', () => {
   setRunning(false);
   advance(1);

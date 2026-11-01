@@ -1,4 +1,4 @@
-import { isWall, tileIndex, type GameMap } from './map';
+import { isWall, tileCost, tileIndex, type GameMap } from './map';
 import type { Team, Tile } from './types';
 
 // Neighbour order breaks ties, so red uses the left/right mirror of blue's order.
@@ -10,6 +10,8 @@ const NEIGHBOURS: Record<Team, Tile[]> = {
 
 export const UNREACHABLE = 999;
 
+// Cheapest cost from every tile to the target. Costs are small integers, so tiles can
+// be bucketed by distance rather than kept in a priority queue.
 export function distanceField(map: GameMap, target: Tile): Int32Array {
   const key = tileIndex(map, target);
   const cached = map.fields.get(key);
@@ -17,18 +19,20 @@ export function distanceField(map: GameMap, target: Tile): Int32Array {
 
   const field = new Int32Array(map.width * map.height).fill(UNREACHABLE);
   field[key] = 0;
-  const queue: Tile[] = [target];
-  for (let head = 0; head < queue.length; head++) {
-    const t = queue[head];
-    const d = field[tileIndex(map, t)];
-    for (const n of NEIGHBOURS.blue) {
-      const x = t.x + n.x;
-      const y = t.y + n.y;
-      if (isWall(map, x, y)) continue;
-      const i = y * map.width + x;
-      if (field[i] === UNREACHABLE) {
-        field[i] = d + 1;
-        queue.push({ x, y });
+  const buckets: Tile[][] = [[target]];
+  for (let d = 0; d < buckets.length; d++) {
+    for (const t of buckets[d] ?? []) {
+      if (field[tileIndex(map, t)] !== d) continue;
+      const cost = d + tileCost(map, t); // stepping onto t is what costs
+      for (const n of NEIGHBOURS.blue) {
+        const x = t.x + n.x;
+        const y = t.y + n.y;
+        if (isWall(map, x, y)) continue;
+        const i = y * map.width + x;
+        if (cost < field[i]) {
+          field[i] = cost;
+          (buckets[cost] ??= []).push({ x, y });
+        }
       }
     }
   }
@@ -52,12 +56,13 @@ export function openNeighbours(map: GameMap, from: Tile, team: Team): Tile[] {
 
 export function stepToward(map: GameMap, from: Tile, target: Tile, team: Team): Tile | null {
   const field = distanceField(map, target);
+  if (field[tileIndex(map, from)] === 0) return null;
   let best: Tile | null = null;
-  let bestDist = field[tileIndex(map, from)];
+  let bestCost = UNREACHABLE;
   for (const n of openNeighbours(map, from, team)) {
-    const d = field[tileIndex(map, n)];
-    if (d < bestDist) {
-      bestDist = d;
+    const cost = field[tileIndex(map, n)] + tileCost(map, n);
+    if (cost < bestCost) {
+      bestCost = cost;
       best = n;
     }
   }

@@ -61,6 +61,7 @@ export interface Agent {
   prev: Tile; // tile the agent is moving from, for render interpolation
   spawn: Tile;
   moveCooldown: number;
+  movePeriod: number; // length of the current move, for render interpolation
   tagCooldown: number; // ticks until this agent can tag again
   respawn: number; // ticks left out of play; 0 = active
   patrolIndex: number;

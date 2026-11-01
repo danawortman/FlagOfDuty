@@ -1,6 +1,6 @@
 import { runAction } from './actions';
 import { startBrain, stepBrain } from './fsm';
-import { createArena, inHalf, manhattan, type GameMap } from './map';
+import { arenaForSeed, createArena, inHalf, manhattan, tileCost, type GameMap } from './map';
 import {
   CAPTURES_TO_WIN,
   FLAG_RETURN_TICKS,
@@ -18,6 +18,7 @@ export interface MatchSetup {
   seed: number;
   blue: Brain[];
   red: Brain[];
+  arena?: number; // chosen from the seed unless given
 }
 
 // Each spawn starts with a small seeded delay, so that otherwise identical agents
@@ -33,7 +34,7 @@ function createFlag(map: GameMap, team: Team): Flag {
 }
 
 export function createWorld(setup: MatchSetup): World {
-  const map = createArena();
+  const map = createArena(setup.arena ?? arenaForSeed(setup.seed));
   const agents: Agent[] = [];
   for (const team of TEAMS) {
     setup[team].forEach((brain, slot) => {
@@ -48,6 +49,7 @@ export function createWorld(setup: MatchSetup): World {
         prev: { ...spawn },
         spawn,
         moveCooldown: 0,
+        movePeriod: MOVE_PERIOD,
         tagCooldown: 0,
         respawn: 0,
         patrolIndex: 0,
@@ -114,6 +116,7 @@ function resolveTags(world: World): void {
     agent.pos = { ...agent.spawn };
     agent.prev = { ...agent.spawn };
     agent.moveCooldown = 0;
+    agent.movePeriod = MOVE_PERIOD;
   }
 }
 
@@ -188,7 +191,8 @@ export function stepWorld(world: World): void {
     if (next) {
       agent.prev = { ...agent.pos };
       agent.pos = next;
-      agent.moveCooldown = MOVE_PERIOD - 1;
+      agent.movePeriod = MOVE_PERIOD * tileCost(world.map, next);
+      agent.moveCooldown = agent.movePeriod - 1;
     }
   });
 
