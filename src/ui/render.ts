@@ -66,7 +66,7 @@ function drawAgent(ctx: CanvasRenderingContext2D, world: World, agent: Agent, al
   const at = agentPosition(agent, alpha);
   const cx = (at.x + 0.5) * TILE;
   const cy = (at.y + 0.5) * TILE;
-  const radius = TILE * 0.38;
+  const radius = TILE * 0.45;
 
   ctx.beginPath();
   ctx.arc(cx, cy, radius, 0, Math.PI * 2);

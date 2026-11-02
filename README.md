@@ -18,8 +18,8 @@ Then open http://localhost:5199.
 - First to 3 captures wins. After 3 minutes (1800 ticks) the leader wins, or it is a draw.
 - Touch the enemy flag to pick it up, then carry it to your own base to score. Your own
   flag does not need to be home.
-- Standing in your own half next to an enemy who is also in your half tags them. They drop
-  any flag and respawn after 4 seconds. Each tag costs the tagger a 5 second recharge.
+- Standing in your own half within one tile of an enemy who is also in your half tags them.
+  They drop any flag and respawn after 4 seconds. Each tag costs the tagger a 5 second recharge.
 - A dropped flag goes home when its own team touches it, or after 10 seconds.
 - Mud takes twice as long to cross, and agents path around it when that is quicker.
 - Each match draws one of four arenas from its seed. After a countdown, matches keep

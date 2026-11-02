@@ -84,9 +84,26 @@ function decide(world: World, agent: Agent): Tile | null {
   return agent.moveCooldown > 0 ? null : next;
 }
 
+// Positions in sixths of a tile, which stays whole for moves of 3 or 6 ticks.
+const TAG_RANGE = 6;
+
+function reached(agent: Agent): Tile {
+  const done = (TAG_RANGE * (agent.movePeriod - agent.moveCooldown)) / agent.movePeriod;
+  return {
+    x: agent.prev.x * TAG_RANGE + (agent.pos.x - agent.prev.x) * done,
+    y: agent.prev.y * TAG_RANGE + (agent.pos.y - agent.prev.y) * done,
+  };
+}
+
+function tagDistance(a: Agent, b: Agent): number {
+  return manhattan(reached(a), reached(b));
+}
+
 function resolveTags(world: World): void {
   // A tag lands on an enemy in the tagger's half, and only a tagger standing in
   // its own half can make it, so defenders are safe and raiders are at risk.
+  // Range is measured between where agents have got to, part way through a move, so
+  // a tag lands when they are side by side on screen.
   // Each tag costs the tagger a recharge, so a coordinated raid can beat a defence.
   const tagged = new Set<Agent>();
   for (const tagger of world.agents) {
@@ -97,7 +114,7 @@ function resolveTags(world: World): void {
         t.respawn === 0 &&
         !tagged.has(t) &&
         inHalf(world.map, tagger.team, t.pos) &&
-        manhattan(tagger.pos, t.pos) <= 1,
+        tagDistance(tagger, t) <= TAG_RANGE,
     );
     if (target) {
       tagged.add(target);
@@ -117,6 +134,19 @@ function resolveTags(world: World): void {
     agent.prev = { ...agent.spawn };
     agent.moveCooldown = 0;
     agent.movePeriod = MOVE_PERIOD;
+  }
+}
+
+function tickTimers(world: World): void {
+  for (const agent of world.agents) {
+    if (agent.respawn > 0) {
+      if (--agent.respawn === 0) {
+        agent.runtime = startBrain(agent.brain, world.tick);
+        agent.moveCooldown = reactionDelay(world);
+      }
+    } else if (agent.tagCooldown > 0) {
+      agent.tagCooldown--;
+    }
   }
 }
 
@@ -167,6 +197,8 @@ function checkFinished(world: World): void {
 export function stepWorld(world: World): void {
   if (world.winner) return;
   world.tick++;
+  tickTimers(world);
+  resolveTags(world);
 
   // Decide from one shared snapshot, then move everyone at once, so neither team
   // gains from being processed first.
@@ -176,16 +208,9 @@ export function stepWorld(world: World): void {
   });
 
   world.agents.forEach((agent, i) => {
-    if (agent.respawn > 0) {
-      if (--agent.respawn === 0) {
-        agent.runtime = startBrain(agent.brain, world.tick);
-        agent.moveCooldown = reactionDelay(world);
-      }
-      return;
-    }
+    if (agent.respawn > 0) return;
     const idle = agent.moveCooldown === 0;
     if (agent.moveCooldown > 0) agent.moveCooldown--;
-    if (agent.tagCooldown > 0) agent.tagCooldown--;
     const next = moves[i];
     if (!next && idle) agent.prev = { ...agent.pos };
     if (next) {
@@ -196,7 +221,6 @@ export function stepWorld(world: World): void {
     }
   });
 
-  resolveTags(world);
   resolveFlags(world);
   resolveCaptures(world);
   checkFinished(world);

@@ -222,6 +222,60 @@ describe('tagging', () => {
     expect(red(w, 1).respawn).toBe(RESPAWN_TICKS);
   });
 
+  it('waits until an approaching target is within one tile', () => {
+    const w = idleWorld();
+    place(blue(w), { x: 8, y: 8 });
+    red(w).prev = { x: 10, y: 8 };
+    red(w).pos = { x: 9, y: 8 };
+    red(w).moveCooldown = 2;
+    stepWorld(w);
+    stepWorld(w);
+    expect(red(w).respawn).toBe(0);
+    stepWorld(w);
+    expect(red(w).respawn).toBe(RESPAWN_TICKS);
+  });
+
+  it('waits until an approaching tagger is within one tile', () => {
+    const w = idleWorld();
+    blue(w).prev = { x: 7, y: 8 };
+    blue(w).pos = { x: 8, y: 8 };
+    blue(w).moveCooldown = 1;
+    place(red(w), { x: 9, y: 8 });
+    stepWorld(w);
+    expect(red(w).respawn).toBe(0);
+    stepWorld(w);
+    expect(red(w).respawn).toBe(RESPAWN_TICKS);
+  });
+
+  it('can tag an agent part way through a move', () => {
+    const w = idleWorld();
+    place(blue(w), { x: 8, y: 8 });
+    red(w).prev = { x: 9, y: 8 };
+    red(w).pos = { x: 8, y: 8 };
+    red(w).moveCooldown = 2;
+    stepWorld(w);
+    expect(red(w).respawn).toBe(RESPAWN_TICKS);
+  });
+
+  it('allows for the slower move across mud', () => {
+    const w = idleWorld();
+    place(blue(w), { x: 8, y: 8 });
+    red(w).prev = { x: 10, y: 8 };
+    red(w).pos = { x: 9, y: 8 };
+    red(w).movePeriod = MOVE_PERIOD * MUD_COST;
+    red(w).moveCooldown = 3; // half way across
+    stepWorld(w);
+    expect(red(w).respawn).toBe(0);
+  });
+
+  it('never tags an agent on a diagonal', () => {
+    const w = idleWorld();
+    place(blue(w), { x: 8, y: 8 });
+    place(red(w), { x: 9, y: 9 });
+    stepWorld(w);
+    expect(red(w).respawn).toBe(0);
+  });
+
   it('restarts the brain when the agent comes back', () => {
     const w = createWorld({ seed: 1, arena: 0, blue: [idle, idle, idle], red: Array(3).fill(brainById('raider')) });
     place(blue(w), { x: 8, y: 8 });
