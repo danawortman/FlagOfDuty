@@ -4,7 +4,9 @@ import { nextSeed } from '../sim/rng';
 import { MATCH_TICKS, SQUAD_SIZE, TICKS_PER_SECOND } from '../sim/rules';
 import { TEAMS, type Team, type World } from '../sim/types';
 import { createWorld, stateHash, stepWorld } from '../sim/world';
-import { renderWorld } from './render';
+import { FacingMemory } from './pose';
+import { renderWorld, type Art } from './render';
+import { loadSprites } from './sprites';
 
 // URL parameters make any moment reproducible, which is what the screenshot tests
 // rely on: ?seed=7&blue=rusher,sentry,raider&red=picket,picket,picket&tick=240&arena=1
@@ -32,12 +34,15 @@ const squads: Record<Team, string[]> = { blue: squadFromUrl('blue'), red: squadF
 let seed = Number(params.get('seed') ?? 1) | 0;
 let world!: World;
 let running = false;
+let art: Art | null = null;
+const facing = new FacingMemory();
 let countdown = 0; // seconds left before kick-off; 0 when not counting
 let carry = 0; // fraction of a tick accumulated between frames
 let lastFrame = 0;
 const slotStates = new Map<number, HTMLElement>();
 
 function newMatch(): void {
+  facing.clear();
   world = createWorld({
     seed,
     blue: squads.blue.map(brainById),
@@ -156,7 +161,7 @@ function frame(now: number): void {
       if (world.winner) startCountdown();
     }
   }
-  renderWorld(ctx, world, running ? carry : 0);
+  renderWorld(ctx, world, running ? carry : 0, art);
   showCountdown();
   requestAnimationFrame(frame);
 }
@@ -202,4 +207,8 @@ declare global {
     flagOfDuty: typeof hook;
   }
 }
-window.flagOfDuty = hook;
+// Tests start once the sprites are in, so every screenshot shows finished art.
+void loadSprites().then((sprites) => {
+  art = { sprites, facing };
+  window.flagOfDuty = hook;
+});

@@ -46,6 +46,7 @@ Then open http://localhost:5199.
   - `sensors.ts`, `actions.ts`: what conditions can read and what states can do.
   - `rules.ts`: every tuning number.
 - `src/ui/`: canvas renderer, squad panels and the `window.flagOfDuty` test hook.
+  - `sprites/`: the agent and shoe art, as SVG. Agents are drawn in blue and recoloured for red.
 - `tests/unit/`: Vitest. `tests/e2e/`: Playwright.
 - `scripts/tournament.ts`: headless balance check.
 

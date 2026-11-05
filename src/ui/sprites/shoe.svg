@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -14 20 28" width="20" height="28">
+  <!-- One sneaker, toe pointing up. -->
+  <path d="M -7 4 C -8 -6 -5 -12 0 -12 C 5 -12 8 -6 7 4 C 6 10 3 12 0 12 C -3 12 -6 10 -7 4 Z"
+        fill="#e8ecf2" stroke="#0d1117" stroke-width="2.5"/>
+  <path d="M -7 4 C -6 10 -3 12 0 12 C 3 12 6 10 7 4" fill="#2b2118"/>
+</svg>

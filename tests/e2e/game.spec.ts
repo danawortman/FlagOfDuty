@@ -156,6 +156,11 @@ test.describe('visual', () => {
     });
   }
 
+  test('agents mid-stride', async ({ page }) => {
+    await open(page, `${MATCH}&tick=31&arena=0`);
+    await expect(id(page, 'arena')).toHaveScreenshot('agents-stride.png');
+  });
+
   test('arena mid-match', async ({ page }) => {
     await open(page, `${MATCH}&tick=240`);
     await expect(id(page, 'arena')).toHaveScreenshot('arena-midmatch.png');
