@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- One jersey barrier segment from above, running left to right. -->
+  <rect x="1" y="9" width="46" height="30" rx="2" fill="#8d959e" stroke="#0d1117" stroke-width="3"/>
+  <rect x="2.5" y="18" width="43" height="12" fill="#b4bbc3"/>
+  <path d="M 2.5 18 H 45.5 M 2.5 30 H 45.5" stroke="#0d1117" stroke-opacity="0.35" stroke-width="2"/>
+  <path d="M 9 13 V 35 M 39 13 V 35" stroke="#f2b84b" stroke-opacity="0.8" stroke-width="3"/>
+</svg>

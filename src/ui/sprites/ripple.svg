@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- Ripples on a puddle. -->
+  <g fill="none" stroke="#bfe0f2" stroke-linecap="round">
+    <ellipse cx="22" cy="24" rx="10" ry="5" stroke-opacity="0.45" stroke-width="2"/>
+    <ellipse cx="22" cy="24" rx="17" ry="9" stroke-opacity="0.2" stroke-width="2"/>
+    <path d="M 33 12 Q 37 10 41 12" stroke-opacity="0.35" stroke-width="2"/>
+  </g>
+</svg>

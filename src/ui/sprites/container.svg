@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 96" width="192" height="96">
+  <!-- Shipping container from above, four tiles long. Its colour is swapped per container. -->
+  <rect x="3" y="4" width="186" height="88" rx="3" fill="#3f7d6e" stroke="#0d1117" stroke-width="4"/>
+  <g stroke="#0d1117" stroke-opacity="0.28" stroke-width="4">
+    <path d="M 22 12 V 84"/>
+    <path d="M 32 12 V 84"/>
+    <path d="M 42 12 V 84"/>
+    <path d="M 52 12 V 84"/>
+    <path d="M 62 12 V 84"/>
+    <path d="M 72 12 V 84"/>
+    <path d="M 82 12 V 84"/>
+    <path d="M 92 12 V 84"/>
+    <path d="M 102 12 V 84"/>
+    <path d="M 112 12 V 84"/>
+    <path d="M 122 12 V 84"/>
+    <path d="M 132 12 V 84"/>
+    <path d="M 142 12 V 84"/>
+    <path d="M 152 12 V 84"/>
+    <path d="M 162 12 V 84"/>
+  </g>
+  <rect x="9" y="10" width="174" height="76" fill="none" stroke="#e8ecf2" stroke-opacity="0.14" stroke-width="2"/>
+  <path d="M 176 10 V 86" stroke="#0d1117" stroke-opacity="0.5" stroke-width="3"/>
+  <g fill="#2b3138" stroke="#0d1117" stroke-width="2">
+    <rect x="5" y="6" width="9" height="9"/>
+    <rect x="178" y="6" width="9" height="9"/>
+    <rect x="5" y="81" width="9" height="9"/>
+    <rect x="178" y="81" width="9" height="9"/>
+  </g>
+</svg>

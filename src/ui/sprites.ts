@@ -1,7 +1,14 @@
 import type { Team } from '../sim/types';
 import agentSvg from './sprites/agent.svg?raw';
+import barrierSvg from './sprites/barrier.svg?raw';
+import concreteSvg from './sprites/concrete.svg?raw';
+import containerSvg from './sprites/container.svg?raw';
+import crackSvg from './sprites/crack.svg?raw';
+import crateSvg from './sprites/crate.svg?raw';
 import handSvg from './sprites/hand.svg?raw';
+import rippleSvg from './sprites/ripple.svg?raw';
 import shoeSvg from './sprites/shoe.svg?raw';
+import tyresSvg from './sprites/tyres.svg?raw';
 
 // The agent sprite is drawn in blue. Red gets the same art with its colours swapped.
 const BLUE_SHIRT = '#4c9bff';
@@ -11,10 +18,20 @@ const TEAM_COLOURS: Record<Team, { shirt: string; cap: string }> = {
   red: { shirt: '#ff6b5e', cap: '#d4483c' },
 };
 
+// Shipping containers come in a few paint jobs; the art is drawn in the first.
+const CONTAINER_PAINT = ['#3f7d6e', '#b5602c', '#3d5a80'];
+
 export interface Sprites {
   agent: Record<Team, HTMLImageElement>;
   hand: HTMLImageElement;
   shoe: HTMLImageElement;
+  containers: HTMLImageElement[];
+  crate: HTMLImageElement;
+  tyres: HTMLImageElement;
+  barrier: HTMLImageElement;
+  concrete: HTMLImageElement;
+  ripple: HTMLImageElement;
+  crack: HTMLImageElement;
 }
 
 function image(svg: string): Promise<HTMLImageElement> {
@@ -32,11 +49,18 @@ export function recolour(svg: string, team: Team): string {
 }
 
 export async function loadSprites(): Promise<Sprites> {
-  const [blue, red, hand, shoe] = await Promise.all([
+  const [blue, red, hand, shoe, crate, tyres, barrier, concrete, ripple, crack, ...containers] = await Promise.all([
     image(recolour(agentSvg, 'blue')),
     image(recolour(agentSvg, 'red')),
     image(handSvg),
     image(shoeSvg),
+    image(crateSvg),
+    image(tyresSvg),
+    image(barrierSvg),
+    image(concreteSvg),
+    image(rippleSvg),
+    image(crackSvg),
+    ...CONTAINER_PAINT.map((paint) => image(containerSvg.split(CONTAINER_PAINT[0]).join(paint))),
   ]);
-  return { agent: { blue, red }, hand, shoe };
+  return { agent: { blue, red }, hand, shoe, containers, crate, tyres, barrier, concrete, ripple, crack };
 }

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- A stack of tyres from above. -->
+  <circle cx="24" cy="24" r="20" fill="#1d2025" stroke="#0d1117" stroke-width="3"/>
+  <circle cx="24" cy="24" r="16.5" fill="none" stroke="#3a3f47" stroke-width="4" stroke-dasharray="3 3"/>
+  <circle cx="24" cy="24" r="10" fill="#4a5058" stroke="#0d1117" stroke-width="2.5"/>
+  <circle cx="24" cy="24" r="6" fill="#111317"/>
+  <path d="M 12 16 A 15 15 0 0 1 22 10" fill="none" stroke="#e8ecf2" stroke-opacity="0.25" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

@@ -1,6 +1,7 @@
-import { isWall } from '../sim/map';
+import { isWall, type GameMap } from '../sim/map';
 import { TEAMS, type Agent, type Team, type Tile, type World } from '../sim/types';
 import { FACING_ANGLE, leftFootOffset, leftHandOffset, moveProgress, type FacingMemory } from './pose';
+import { isEdge, mirroredHash, propsFor, type Prop } from './scenery';
 import type { Sprites } from './sprites';
 
 export const TILE = 48;
@@ -12,10 +13,15 @@ const HAND_X = 41; // at the ends of the shoulders
 const HAND_Y = 8;
 
 const COLORS = {
-  floorBlue: '#1c2735',
-  floorRed: '#2f2125',
-  wall: '#3f4a5b',
-  mud: '#5a4a32',
+  verge: '#16191e',
+  asphalt: '#2b2f35',
+  asphaltLight: '#2e3238',
+  tintBlue: 'rgb(76 155 255 / 0.07)',
+  tintRed: 'rgb(255 107 94 / 0.07)',
+  water: 'rgb(45 76 99 / 0.85)',
+  waterEdge: '#5b88a6',
+  paint: '#e8ecf2',
+  fence: '#a7afb8',
   blue: '#4c9bff',
   red: '#ff6b5e',
   outline: '#0d1117',
@@ -29,24 +35,200 @@ export interface Art {
 
 const teamColor = (team: Team): string => COLORS[team];
 
-function drawArena(ctx: CanvasRenderingContext2D, world: World): void {
-  const { map } = world;
+// Mud is rain water here: each puddle tile rounds the corners where it meets dry ground.
+function drawPuddles(ctx: CanvasRenderingContext2D, map: GameMap, sprites: Sprites): void {
+  const wet = (x: number, y: number) => x >= 0 && y >= 0 && x < map.width && y < map.height && map.mud[y * map.width + x];
+  const r = TILE * 0.35;
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
-      if (isWall(map, x, y)) ctx.fillStyle = COLORS.wall;
-      else if (map.mud[y * map.width + x]) ctx.fillStyle = COLORS.mud;
-      else ctx.fillStyle = x < map.width / 2 ? COLORS.floorBlue : COLORS.floorRed;
-      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      if (!wet(x, y)) continue;
+      const n = wet(x, y - 1), e = wet(x + 1, y), s = wet(x, y + 1), w = wet(x - 1, y);
+      ctx.beginPath();
+      ctx.roundRect(x * TILE, y * TILE, TILE, TILE, [!n && !w ? r : 0, !n && !e ? r : 0, !s && !e ? r : 0, !s && !w ? r : 0]);
+      ctx.fillStyle = COLORS.water;
+      ctx.fill();
     }
   }
+  // A light rim along the shore: straight edges stop where a corner is rounded,
+  // and the rounded corners get an arc, so the rim runs unbroken round each puddle.
+  ctx.strokeStyle = COLORS.waterEdge;
+  ctx.lineWidth = 2;
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (!wet(x, y)) continue;
+      const px = x * TILE;
+      const py = y * TILE;
+      const n = !wet(x, y - 1), e = !wet(x + 1, y), s = !wet(x, y + 1), w = !wet(x - 1, y);
+      const nw = n && w ? r : 0, ne = n && e ? r : 0, se = s && e ? r : 0, sw = s && w ? r : 0;
+      ctx.beginPath();
+      if (n) { ctx.moveTo(px + nw, py + 1); ctx.lineTo(px + TILE - ne, py + 1); }
+      if (s) { ctx.moveTo(px + sw, py + TILE - 1); ctx.lineTo(px + TILE - se, py + TILE - 1); }
+      if (w) { ctx.moveTo(px + 1, py + nw); ctx.lineTo(px + 1, py + TILE - sw); }
+      if (e) { ctx.moveTo(px + TILE - 1, py + ne); ctx.lineTo(px + TILE - 1, py + TILE - se); }
+      ctx.stroke();
+      const arc = (cx: number, cy: number, from: number) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r - 1, from, from + Math.PI / 2);
+        ctx.stroke();
+      };
+      if (nw) arc(px + r, py + r, Math.PI);
+      if (ne) arc(px + TILE - r, py + r, -Math.PI / 2);
+      if (se) arc(px + TILE - r, py + TILE - r, 0);
+      if (sw) arc(px + r, py + TILE - r, Math.PI / 2);
+      if (mirroredHash(map, x, y) % 4 === 0) ctx.drawImage(sprites.ripple, px, py, TILE, TILE);
+    }
+  }
+}
+
+function drawMarkings(ctx: CanvasRenderingContext2D, map: GameMap): void {
+  const midX = (map.width / 2) * TILE;
+  const midY = (map.height / 2) * TILE;
+  ctx.strokeStyle = COLORS.paint;
+  ctx.globalAlpha = 0.45;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(midX, TILE);
+  ctx.lineTo(midX, (map.height - 1) * TILE);
+  ctx.stroke();
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(midX, midY, TILE * 1.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Each base is a painted square in its team's colour.
   for (const team of TEAMS) {
     const home = map.flagHome[team];
-    ctx.beginPath();
-    ctx.arc((home.x + 0.5) * TILE, (home.y + 0.5) * TILE, TILE * 0.62, 0, Math.PI * 2);
+    const x = (home.x - 1) * TILE;
+    const y = (home.y - 1) * TILE;
+    ctx.fillStyle = teamColor(team);
+    ctx.globalAlpha = 0.16;
+    ctx.fillRect(x, y, TILE * 3, TILE * 3);
+    ctx.globalAlpha = 0.85;
     ctx.lineWidth = 4;
     ctx.strokeStyle = teamColor(team);
-    ctx.stroke();
+    ctx.setLineDash([12, 8]);
+    ctx.strokeRect(x + 2, y + 2, TILE * 3 - 4, TILE * 3 - 4);
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
   }
+}
+
+function drawProp(ctx: CanvasRenderingContext2D, sprites: Sprites, prop: Prop): void {
+  const x = prop.x * TILE;
+  const y = prop.y * TILE;
+  const w = prop.w * TILE;
+  const h = prop.h * TILE;
+  const turned = (img: HTMLImageElement) => {
+    // Sprites are drawn running left to right; turn them for upright props.
+    ctx.save();
+    ctx.translate(x + w / 2, y + h / 2);
+    if (prop.vertical) ctx.rotate(Math.PI / 2);
+    const [len, wide] = prop.vertical ? [h, w] : [w, h];
+    ctx.drawImage(img, -len / 2, -wide / 2, len, wide);
+    ctx.restore();
+  };
+  switch (prop.kind) {
+    case 'container':
+      turned(sprites.containers[prop.variant % sprites.containers.length]);
+      break;
+    case 'barrier':
+      turned(sprites.barrier);
+      break;
+    case 'concrete':
+      ctx.drawImage(sprites.concrete, x, y, w, h);
+      break;
+    case 'crate':
+      ctx.drawImage(sprites.crate, x, y, w, h);
+      break;
+    case 'tyres':
+    case 'crates': {
+      const img = prop.kind === 'tyres' ? sprites.tyres : sprites.crate;
+      for (let ty = 0; ty < prop.h; ty++) {
+        for (let tx = 0; tx < prop.w; tx++) ctx.drawImage(img, x + tx * TILE, y + ty * TILE, TILE, TILE);
+      }
+      break;
+    }
+  }
+}
+
+// A chain-link fence runs round the inside of the arena's outer edge.
+function drawFence(ctx: CanvasRenderingContext2D, map: GameMap): void {
+  const x0 = TILE - 3;
+  const y0 = TILE - 3;
+  const x1 = (map.width - 1) * TILE + 3;
+  const y1 = (map.height - 1) * TILE + 3;
+  ctx.strokeStyle = 'rgb(0 0 0 / 0.45)';
+  ctx.lineWidth = 7;
+  ctx.strokeRect(x0 + 3, y0 + 3, x1 - x0, y1 - y0);
+  ctx.strokeStyle = COLORS.fence;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.setLineDash([2, 4]);
+  ctx.lineWidth = 6;
+  ctx.globalAlpha = 0.5;
+  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = COLORS.fence;
+  ctx.strokeStyle = COLORS.outline;
+  ctx.lineWidth = 2;
+  const post = (px: number, py: number) => {
+    ctx.beginPath();
+    ctx.arc(px, py, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  };
+  for (let x = 1; x < map.width; x += 2) {
+    post(x * TILE, y0);
+    post(x * TILE, y1);
+  }
+  for (let y = 1; y < map.height; y += 2) {
+    post(x0, y * TILE);
+    post(x1, y * TILE);
+  }
+}
+
+// Everything that never moves is drawn once per arena and reused every frame.
+function drawBackground(ctx: CanvasRenderingContext2D, map: GameMap, sprites: Sprites): void {
+  ctx.fillStyle = COLORS.verge;
+  ctx.fillRect(0, 0, map.width * TILE, map.height * TILE);
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (isEdge(map, x, y)) continue;
+      const shade = mirroredHash(map, x, y);
+      ctx.fillStyle = shade % 4 === 0 ? COLORS.asphaltLight : COLORS.asphalt;
+      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      ctx.fillStyle = x < map.width / 2 ? COLORS.tintBlue : COLORS.tintRed;
+      ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      if (!isWall(map, x, y) && !map.mud[y * map.width + x] && shade % 13 === 0) {
+        // Cracks are flipped on the red side and the bottom half, so they mirror too.
+        ctx.save();
+        ctx.translate((x + 0.5) * TILE, (y + 0.5) * TILE);
+        ctx.scale(x < map.width / 2 ? 1 : -1, y <= map.height / 2 ? 1 : -1);
+        ctx.drawImage(sprites.crack, -TILE / 2, -TILE / 2, TILE, TILE);
+        ctx.restore();
+      }
+    }
+  }
+  drawPuddles(ctx, map, sprites);
+  drawMarkings(ctx, map);
+  for (const prop of propsFor(map)) drawProp(ctx, sprites, prop);
+  drawFence(ctx, map);
+}
+
+const backgrounds = new WeakMap<GameMap, HTMLCanvasElement>();
+
+function background(map: GameMap, sprites: Sprites): HTMLCanvasElement {
+  let canvas = backgrounds.get(map);
+  if (!canvas) {
+    canvas = document.createElement('canvas');
+    canvas.width = map.width * TILE;
+    canvas.height = map.height * TILE;
+    drawBackground(canvas.getContext('2d')!, map, sprites);
+    backgrounds.set(map, canvas);
+  }
+  return canvas;
 }
 
 function drawFlagGlyph(ctx: CanvasRenderingContext2D, team: Team, x: number, y: number, size: number): void {
@@ -118,15 +300,19 @@ function drawAgent(ctx: CanvasRenderingContext2D, world: World, agent: Agent, al
   if (carried) drawFlagGlyph(ctx, carried, cx + SPRITE * 0.25, cy - SPRITE * 0.2, 24);
 }
 
-// Agents are drawn once their sprites have loaded.
+// The arena is drawn once the sprites have loaded.
 export function renderWorld(ctx: CanvasRenderingContext2D, world: World, alpha: number, art: Art | null): void {
-  drawArena(ctx, world);
+  if (!art) {
+    ctx.fillStyle = COLORS.verge;
+    ctx.fillRect(0, 0, world.map.width * TILE, world.map.height * TILE);
+    return;
+  }
+  ctx.drawImage(background(world.map, art.sprites), 0, 0);
   for (const team of TEAMS) {
     const flag = world.flags[team];
     if (flag.status !== 'carried') {
       drawFlagGlyph(ctx, team, (flag.pos.x + 0.42) * TILE, (flag.pos.y + 0.62) * TILE, 28);
     }
   }
-  if (!art) return;
   for (const agent of world.agents) drawAgent(ctx, world, agent, alpha, art);
 }
