@@ -10,4 +10,4 @@ export const REACTION_JITTER_TICKS = 6;
 export const FLAG_RETURN_TICKS = 100;
 export const VISION_RANGE = 9;
 export const NOT_SEEN = 99; // distance sensors read this when nothing qualifies
-export const SQUAD_SIZE = 3;
+export const SQUAD_SIZE = 5;

@@ -1,6 +1,6 @@
 # Flag of Duty
 
-A Capture the Flag game in the browser. Squads of three autonomous agents play on a 2D
+A Capture the Flag game in the browser. Squads of five autonomous agents play on a 2D
 arena, each driven by a state machine.
 
 ## Run it
@@ -56,7 +56,7 @@ Then open http://localhost:5199.
 Any exact moment can be loaded from the URL, which keeps screenshots deterministic:
 
 ```
-/?seed=7&blue=raider,rusher,sentry&red=picket,rusher,sentry&tick=240&arena=1
+/?seed=7&blue=raider,rusher,sentry,shadow,picket&red=picket,rusher,sentry,goalkeeper,raider&tick=240&arena=1
 ```
 
 Playwright starts its own server on port 5198 and never reuses one, so a dev server left

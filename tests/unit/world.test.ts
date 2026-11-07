@@ -12,6 +12,7 @@ import {
   MOVE_PERIOD,
   MUD_COST,
   RESPAWN_TICKS,
+  SQUAD_SIZE,
   TAG_RECHARGE_TICKS,
 } from '../../src/sim/rules';
 import { readSensor } from '../../src/sim/sensors';
@@ -26,8 +27,10 @@ const idle: Brain = {
   transitions: [],
 };
 
+const squadOf = (brain: Brain): Brain[] => Array(SQUAD_SIZE).fill(brain);
+
 function idleWorld(): World {
-  const world = createWorld({ seed: 1, arena: 0, blue: [idle, idle, idle], red: [idle, idle, idle] });
+  const world = createWorld({ seed: 1, arena: 0, blue: squadOf(idle), red: squadOf(idle) });
   world.agents.forEach((a) => (a.moveCooldown = 0));
   return world;
 }
@@ -38,7 +41,7 @@ function place(agent: Agent, tile: Tile): void {
 }
 
 const blue = (w: World, i = 0) => w.agents[i];
-const red = (w: World, i = 0) => w.agents[3 + i];
+const red = (w: World, i = 0) => w.agents[SQUAD_SIZE + i];
 
 describe.each(ARENAS.map((arena, i) => [arena.name, i] as const))('arena %s', (_name, index) => {
   const map = createArena(index);
@@ -69,7 +72,7 @@ describe.each(ARENAS.map((arena, i) => [arena.name, i] as const))('arena %s', (_
     const tiles = [...map.spawns.blue, ...map.basePatrol.blue, ...map.midfieldPatrol.blue, map.flank.blue];
     for (const t of tiles) expect(isWall(map, t.x, t.y)).toBe(false);
     expect(map.flagHome.red).toEqual(mirrorX(map.width, map.flagHome.blue));
-    expect(map.spawns.blue).toHaveLength(3);
+    expect(map.spawns.blue).toHaveLength(SQUAD_SIZE);
   });
 });
 
@@ -97,7 +100,7 @@ describe('arena selection', () => {
 
   it('uses the arena for its seed unless one is given', () => {
     const seed = 11;
-    const setup = { seed, blue: [idle, idle, idle], red: [idle, idle, idle] };
+    const setup = { seed, blue: squadOf(idle), red: squadOf(idle) };
     expect(createWorld(setup).map.name).toBe(ARENAS[arenaForSeed(seed)].name);
     expect(createWorld({ ...setup, arena: 2 }).map.name).toBe(ARENAS[2].name);
   });
@@ -119,7 +122,7 @@ describe('mud', () => {
   });
 
   it('slows an agent stepping onto it', () => {
-    const w = createWorld({ seed: 1, arena: 1, blue: [brainById('rusher'), idle, idle], red: [idle, idle, idle] });
+    const w = createWorld({ seed: 1, arena: 1, blue: [brainById('rusher'), ...squadOf(idle).slice(1)], red: squadOf(idle) });
     const a = w.agents[0];
     place(a, { x: 9, y: 2 });
     a.moveCooldown = 0;
@@ -159,8 +162,8 @@ describe('mud', () => {
 describe('determinism', () => {
   const setup = (seed: number) => ({
     seed,
-    blue: ['raider', 'rusher', 'sentry'].map(brainById),
-    red: ['picket', 'rusher', 'sentry'].map(brainById),
+    blue: ['raider', 'rusher', 'sentry', 'shadow', 'picket'].map(brainById),
+    red: ['picket', 'rusher', 'sentry', 'goalkeeper', 'raider'].map(brainById),
   });
 
   it('gives the same match for the same seed', () => {
@@ -277,7 +280,7 @@ describe('tagging', () => {
   });
 
   it('restarts the brain when the agent comes back', () => {
-    const w = createWorld({ seed: 1, arena: 0, blue: [idle, idle, idle], red: Array(3).fill(brainById('raider')) });
+    const w = createWorld({ seed: 1, arena: 0, blue: squadOf(idle), red: squadOf(brainById('raider')) });
     place(blue(w), { x: 8, y: 8 });
     place(red(w), { x: 9, y: 8 });
     red(w).runtime.state = 'runHome';
@@ -315,7 +318,7 @@ describe('flags', () => {
     w.flags.red.status = 'carried';
     w.flags.red.carrier = 0;
     w.flags.blue.status = 'carried';
-    w.flags.blue.carrier = 3;
+    w.flags.blue.carrier = red(w).id;
     place(blue(w), w.map.flagHome.blue);
     stepWorld(w);
     expect(w.score.blue).toBe(1);
@@ -326,7 +329,7 @@ describe('flags', () => {
   it('drops where the carrier is tagged', () => {
     const w = idleWorld();
     w.flags.blue.status = 'carried';
-    w.flags.blue.carrier = 3;
+    w.flags.blue.carrier = red(w).id;
     const spot = { x: 8, y: 8 };
     place(red(w), spot);
     place(blue(w), { x: 8, y: 7 });
@@ -389,7 +392,7 @@ describe('sensors', () => {
   it('reads the flag state from each team\'s point of view', () => {
     const w = idleWorld();
     w.flags.blue.status = 'carried';
-    w.flags.blue.carrier = 3;
+    w.flags.blue.carrier = red(w).id;
     expect(readSensor(w, blue(w), 'ourFlagTaken', 0)).toBe(1);
     expect(readSensor(w, red(w), 'iHaveFlag', 0)).toBe(1);
     expect(readSensor(w, red(w), 'ourFlagHome', 0)).toBe(1);
@@ -419,7 +422,7 @@ describe('brains', () => {
 
   it('plays full matches with every brain', () => {
     for (const brain of BRAINS) {
-      const w = runToEnd(createWorld({ seed: 3, blue: Array(3).fill(brain), red: Array(3).fill(brainById('picket')) }));
+      const w = runToEnd(createWorld({ seed: 3, blue: squadOf(brain), red: squadOf(brainById('picket')) }));
       expect(w.winner, brain.id).not.toBeNull();
     }
   });
@@ -428,7 +431,7 @@ describe('brains', () => {
     const wins = (a: string, b: string): number => {
       let total = 0;
       for (let seed = 1; seed <= 20; seed++) {
-        const w = runToEnd(createWorld({ seed, arena: 0, blue: Array(3).fill(brainById(a)), red: Array(3).fill(brainById(b)) }));
+        const w = runToEnd(createWorld({ seed, arena: 0, blue: squadOf(brainById(a)), red: squadOf(brainById(b)) }));
         if (w.winner === 'blue') total++;
         else if (w.winner === 'red') total--;
       }

@@ -15,7 +15,7 @@ import {
 import { recolour } from '../../src/ui/sprites';
 
 function agent(): Agent {
-  const w = createWorld({ seed: 1, arena: 0, blue: Array(3).fill(brainById('rusher')), red: Array(3).fill(brainById('rusher')) });
+  const w = createWorld({ seed: 1, arena: 0, blue: Array(5).fill(brainById('rusher')), red: Array(5).fill(brainById('rusher')) });
   const a = w.agents[0];
   a.prev = { x: 5, y: 5 };
   a.pos = { x: 5, y: 5 };

@@ -9,12 +9,12 @@ import { renderWorld, type Art } from './render';
 import { loadSprites } from './sprites';
 
 // URL parameters make any moment reproducible, which is what the screenshot tests
-// rely on: ?seed=7&blue=rusher,sentry,raider&red=picket,picket,picket&tick=240&arena=1
+// rely on: ?seed=7&blue=rusher,sentry,raider,shadow,picket&red=picket,picket,picket,picket,picket&tick=240&arena=1
 const params = new URLSearchParams(location.search);
 const COUNTDOWN_SECONDS = 3;
 const DEFAULTS: Record<Team, string[]> = {
-  blue: ['raider', 'rusher', 'sentry'],
-  red: ['picket', 'shadow', 'goalkeeper'],
+  blue: ['raider', 'rusher', 'sentry', 'shadow', 'picket'],
+  red: ['picket', 'shadow', 'goalkeeper', 'rusher', 'raider'],
 };
 
 function squadFromUrl(team: Team): string[] {

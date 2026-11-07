@@ -6,8 +6,8 @@ import { arenaForSeed } from '../../src/sim/map';
 import { createWorld, stateHash, stepWorld } from '../../src/sim/world';
 
 // A fixed match, reproducible in the browser and in Node.
-const BLUE = ['raider', 'rusher', 'sentry'];
-const RED = ['picket', 'rusher', 'sentry'];
+const BLUE = ['raider', 'rusher', 'sentry', 'shadow', 'picket'];
+const RED = ['picket', 'rusher', 'sentry', 'goalkeeper', 'raider'];
 const MATCH = `seed=7&blue=${BLUE.join(',')}&red=${RED.join(',')}`;
 
 const id = (page: Page, testId: string) => page.getByTestId(testId);
@@ -96,7 +96,7 @@ test.describe('behaviour', () => {
   });
 
   test('a finished match shows its result, then the next match starts on a new seed', async ({ page }) => {
-    await open(page, 'seed=2&blue=sentry,sentry,sentry&red=sentry,sentry,sentry');
+    await open(page, 'seed=2&blue=sentry,sentry,sentry,sentry,sentry&red=sentry,sentry,sentry,sentry,sentry');
     await page.evaluate(() => window.flagOfDuty.advance(1799));
     await id(page, 'play').click();
     await expect(id(page, 'tick')).toHaveText('Draw');
@@ -111,7 +111,7 @@ test.describe('behaviour', () => {
   });
 
   test('restart stops the run of matches', async ({ page }) => {
-    await open(page, 'seed=2&blue=sentry,sentry,sentry&red=sentry,sentry,sentry');
+    await open(page, 'seed=2&blue=sentry,sentry,sentry,sentry,sentry&red=sentry,sentry,sentry,sentry,sentry');
     await page.evaluate(() => window.flagOfDuty.advance(1799));
     await id(page, 'play').click();
     await expect(id(page, 'countdown')).toBeVisible();
