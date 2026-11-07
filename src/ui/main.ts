@@ -28,12 +28,14 @@ const canvas = byTestId<HTMLCanvasElement>('arena');
 const ctx = canvas.getContext('2d')!;
 const playButton = byTestId<HTMLButtonElement>('play');
 const seedInput = byTestId<HTMLInputElement>('seed');
+const speedSelect = byTestId<HTMLSelectElement>('speed');
 const countdownEl = byTestId('countdown');
 
 const squads: Record<Team, string[]> = { blue: squadFromUrl('blue'), red: squadFromUrl('red') };
 let seed = Number(params.get('seed') ?? 1) | 0;
 let world!: World;
 let running = false;
+let speed = 1; // playback speed; it changes only how fast ticks play, never what happens
 let art: Art | null = null;
 const facing = new FacingMemory();
 let countdown = 0; // seconds left before kick-off; 0 when not counting
@@ -211,7 +213,7 @@ function frame(now: number): void {
     if (countdown === 0) kickOff();
   }
   if (running) {
-    carry += (dt / 1000) * TICKS_PER_SECOND;
+    carry += (dt / 1000) * TICKS_PER_SECOND * speed;
     const whole = Math.floor(carry);
     if (whole > 0) {
       carry -= whole;
@@ -245,6 +247,9 @@ byTestId('step').addEventListener('click', () => {
   refresh();
 });
 byTestId('restart').addEventListener('click', newMatch);
+speedSelect.addEventListener('change', () => {
+  speed = Number(speedSelect.value);
+});
 seedInput.addEventListener('change', () => {
   seed = Number(seedInput.value) | 0;
   newMatch();

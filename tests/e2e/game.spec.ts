@@ -197,6 +197,51 @@ test.describe('behaviour', () => {
     await expect(id(page, 'agent-red')).toContainText('Click a red agent');
   });
 
+  test('speed starts at 1x and offers half to eight times', async ({ page }) => {
+    await open(page);
+    await expect(id(page, 'speed')).toHaveValue('1');
+    await expect(id(page, 'speed').locator('option')).toHaveText(['½×', '1×', '2×', '4×', '8×']);
+  });
+
+  test('a faster speed plays more ticks in the same time', async ({ page }) => {
+    const ticksIn = async (speed: string): Promise<number> => {
+      await open(page);
+      await id(page, 'speed').selectOption(speed);
+      await id(page, 'play').click();
+      await page.waitForFunction(() => window.flagOfDuty.tick() > 0, undefined, { timeout: 6000 });
+      const start = await page.evaluate(() => window.flagOfDuty.tick());
+      await page.waitForTimeout(1500);
+      return (await page.evaluate(() => window.flagOfDuty.tick())) - start;
+    };
+    const half = await ticksIn('0.5');
+    const eight = await ticksIn('8');
+    expect(half).toBeLessThan(12); // about 7 at half speed
+    expect(eight).toBeGreaterThan(4 * half);
+  });
+
+  test('changing speed keeps the match going', async ({ page }) => {
+    await open(page);
+    await page.evaluate(() => window.flagOfDuty.advance(50));
+    await id(page, 'play').click();
+    await id(page, 'speed').selectOption('4');
+    await expect(id(page, 'play')).toHaveText('Pause');
+    await page.waitForFunction(() => window.flagOfDuty.tick() > 60);
+    await expect(id(page, 'seed')).toHaveValue('7');
+  });
+
+  test('the match plays out the same at any speed', async ({ page }) => {
+    await open(page);
+    await id(page, 'speed').selectOption('8');
+    await id(page, 'play').click();
+    await page.waitForFunction(() => window.flagOfDuty.tick() >= 200, undefined, { timeout: 15000 });
+    await id(page, 'play').click();
+    const tick = await page.evaluate(() => window.flagOfDuty.tick());
+    const fast = await page.evaluate(() => window.flagOfDuty.hash());
+    await open(page);
+    await page.evaluate((n) => window.flagOfDuty.advance(n), tick);
+    expect(await page.evaluate(() => window.flagOfDuty.hash())).toBe(fast);
+  });
+
   test('the layout has no horizontal scroll at phone width', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page);

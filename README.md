@@ -13,6 +13,8 @@ npm run dev
 
 Then open http://localhost:5199.
 
+Speed plays matches at ½× to 8×, without changing what happens in them.
+
 Click an agent, or its number in the squad, to follow it: its team's panel shows its brain and
 states, with the active state highlighted. Click empty ground to stop following.
 
