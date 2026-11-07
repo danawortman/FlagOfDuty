@@ -14,7 +14,7 @@ export default defineConfig({
     toHaveScreenshot: { threshold: 0.02, maxDiffPixels: 40, animations: 'disabled' },
   },
   use: {
-    baseURL: 'http://localhost:5198',
+    baseURL: 'http://localhost:5191',
     viewport: { width: 1440, height: 900 },
     deviceScaleFactor: 1,
     trace: 'retain-on-failure',
@@ -22,8 +22,8 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 } }],
   webServer: {
     // Its own port, never reused, so a dev server left open cannot be tested by mistake.
-    command: 'npx vite --port 5198 --strictPort',
-    url: 'http://localhost:5198',
+    command: 'npx vite --port 5191 --strictPort',
+    url: 'http://localhost:5191',
     reuseExistingServer: false,
     timeout: 30_000,
   },

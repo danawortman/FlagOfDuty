@@ -14,6 +14,13 @@ const id = (page: Page, testId: string) => page.getByTestId(testId);
 const hook = <T>(page: Page, fn: (h: Window['flagOfDuty']) => T) =>
   page.evaluate(`(${fn.toString()})(window.flagOfDuty)`) as Promise<T>;
 
+async function clickAgent(page: Page, agentId: number): Promise<void> {
+  const arena = page.getByTestId('arena');
+  const box = (await arena.boundingBox())!;
+  const at = await page.evaluate((n) => window.flagOfDuty.agentOnCanvas(n), agentId);
+  await arena.click({ position: { x: at.x * box.width, y: at.y * box.height } });
+}
+
 async function open(page: Page, query = MATCH): Promise<void> {
   await page.goto(`/?${query}`);
   await expect(id(page, 'tick')).toBeVisible();
@@ -134,6 +141,62 @@ test.describe('behaviour', () => {
     await expect(id(page, 'state-red-2')).toHaveText('Patrol');
   });
 
+  test('clicking an agent shows it in its team\'s panel', async ({ page }) => {
+    await open(page);
+    await expect(id(page, 'agent-blue')).toContainText('Click a blue agent');
+    await clickAgent(page, 0);
+    await expect(id(page, 'agent-blue-title')).toHaveText('1Blue 1 · Raider');
+    const states = id(page, 'agent-blue-states').locator('li');
+    await expect(states).toHaveText(['Approach', 'Dodge', 'Loop Round', 'Run Home', 'Juke']);
+    await expect(states.and(page.locator('[data-active="true"]'))).toHaveText('Approach');
+    await expect(id(page, 'agent-red')).toContainText('Click a red agent');
+  });
+
+  test('follows one agent from each team at once', async ({ page }) => {
+    await open(page);
+    await clickAgent(page, 0);
+    await clickAgent(page, 5);
+    await expect(id(page, 'agent-blue-title')).toContainText('Blue 1 · Raider');
+    await expect(id(page, 'agent-red-title')).toContainText('Red 1 · Picket');
+    await clickAgent(page, 1);
+    await expect(id(page, 'agent-blue-title')).toContainText('Blue 2 · Rusher');
+    await expect(id(page, 'agent-red-title')).toContainText('Red 1 · Picket');
+  });
+
+  test('the squad number selects too, and its row is marked', async ({ page }) => {
+    await open(page);
+    await id(page, 'pick-red-2').click();
+    await expect(id(page, 'agent-red-title')).toContainText('Red 3 · Sentry');
+    await expect(id(page, 'pick-red-2').locator('xpath=..')).toHaveAttribute('data-selected', 'true');
+    await expect(id(page, 'pick-red-1').locator('xpath=..')).toHaveAttribute('data-selected', 'false');
+  });
+
+  test('the active state follows the match', async ({ page }) => {
+    await open(page);
+    await id(page, 'pick-blue-1').click();
+    for (const ticks of [40, 80, 160]) {
+      await page.evaluate((n) => window.flagOfDuty.advance(n), ticks);
+      const shown = await id(page, 'state-blue-1').textContent();
+      const status = await id(page, 'agent-blue-status').textContent();
+      if (status === 'Respawning…') {
+        await expect(id(page, 'agent-blue-states').locator('[data-active="true"]')).toHaveCount(0);
+      } else {
+        await expect(id(page, 'agent-blue-states').locator('[data-active="true"]')).toHaveText(shown!);
+      }
+    }
+  });
+
+  test('clicking empty ground stops following', async ({ page }) => {
+    await open(page);
+    await clickAgent(page, 0);
+    await clickAgent(page, 5);
+    const arena = id(page, 'arena');
+    const box = (await arena.boundingBox())!;
+    await arena.click({ position: { x: box.width / 2, y: box.height * 0.04 } });
+    await expect(id(page, 'agent-blue')).toContainText('Click a blue agent');
+    await expect(id(page, 'agent-red')).toContainText('Click a red agent');
+  });
+
   test('the layout has no horizontal scroll at phone width', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page);
@@ -159,6 +222,13 @@ test.describe('visual', () => {
   test('agents mid-stride', async ({ page }) => {
     await open(page, `${MATCH}&tick=31&arena=0`);
     await expect(id(page, 'arena')).toHaveScreenshot('agents-stride.png');
+  });
+
+  test('both panels following an agent', async ({ page }) => {
+    await open(page, `${MATCH}&tick=120&arena=0`);
+    await clickAgent(page, 1);
+    await clickAgent(page, 7);
+    await expect(page).toHaveScreenshot('page-following.png');
   });
 
   test('arena mid-match', async ({ page }) => {

@@ -20,6 +20,8 @@
     </header>
 
     <main class="layout">
+      <aside class="agent-panel blue" data-testid="agent-blue" aria-live="polite"></aside>
+
       <section class="stage">
         <div class="arena-frame">
           <canvas id="arena" data-testid="arena" width="1536" height="816"></canvas>
@@ -42,6 +44,8 @@
           <section class="squad red" data-testid="squad-red"><h2>Red squad</h2></section>
         </div>
       </section>
+
+      <aside class="agent-panel red" data-testid="agent-red" aria-live="polite"></aside>
     </main>
 
     <script type="module" src="/src/ui/main.ts"></script>

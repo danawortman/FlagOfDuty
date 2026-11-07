@@ -2,10 +2,10 @@ import { BRAINS, brainById } from '../sim/brains';
 import { activeState } from '../sim/fsm';
 import { nextSeed } from '../sim/rng';
 import { MATCH_TICKS, SQUAD_SIZE, TICKS_PER_SECOND } from '../sim/rules';
-import { TEAMS, type Team, type World } from '../sim/types';
+import { TEAMS, type Agent, type Team, type World } from '../sim/types';
 import { createWorld, stateHash, stepWorld } from '../sim/world';
 import { FacingMemory } from './pose';
-import { renderWorld, type Art } from './render';
+import { agentAt, agentOnCanvas, renderWorld, type Art } from './render';
 import { loadSprites } from './sprites';
 
 // URL parameters make any moment reproducible, which is what the screenshot tests
@@ -40,6 +40,9 @@ let countdown = 0; // seconds left before kick-off; 0 when not counting
 let carry = 0; // fraction of a tick accumulated between frames
 let lastFrame = 0;
 const slotStates = new Map<number, HTMLElement>();
+const slotRows = new Map<number, HTMLElement>();
+// One followed agent per team, by agent id. Ids stay the same from match to match.
+const followed: Record<Team, number | null> = { blue: null, red: null };
 
 function newMatch(): void {
   facing.clear();
@@ -108,7 +111,58 @@ function refresh(): void {
   for (const agent of world.agents) {
     const el = slotStates.get(agent.id)!;
     el.textContent = agent.respawn > 0 ? 'Respawning…' : activeState(agent.brain, agent.runtime).name;
+    slotRows.get(agent.id)!.dataset.selected = String(followed[agent.team] === agent.id);
   }
+  for (const team of TEAMS) showAgentPanel(team);
+}
+
+const teamName = (team: Team): string => (team === 'blue' ? 'Blue' : 'Red');
+
+function element<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text = ''): HTMLElementTagNameMap[K] {
+  const el = document.createElement(tag);
+  el.className = className;
+  el.textContent = text;
+  return el;
+}
+
+function showAgentPanel(team: Team): void {
+  const panel = byTestId(`agent-${team}`);
+  const id = followed[team];
+  if (id === null) {
+    panel.replaceChildren(
+      element('h2', '', `${teamName(team)} agent`),
+      element('p', 'agent-hint', `Click a ${team} agent, or its number in the squad, to follow it.`),
+    );
+    return;
+  }
+  const agent: Agent = world.agents[id];
+  const title = element('p', 'agent-title');
+  title.dataset.testid = `agent-${team}-title`;
+  title.append(element('span', 'slot-id', String(agent.slot + 1)), `${teamName(team)} ${agent.slot + 1} · ${agent.brain.name}`);
+
+  const status = element('p', 'agent-status', agent.respawn > 0 ? 'Respawning…' : 'On the field');
+  status.dataset.testid = `agent-${team}-status`;
+
+  const list = element('ol', 'state-list');
+  list.dataset.testid = `agent-${team}-states`;
+  const active = agent.respawn > 0 ? null : activeState(agent.brain, agent.runtime).id;
+  for (const state of agent.brain.states) {
+    const item = element('li', '', state.name);
+    item.dataset.active = String(state.id === active);
+    list.append(item);
+  }
+  panel.replaceChildren(element('h2', '', `${teamName(team)} agent`), title, status, element('h2', '', 'States'), list);
+}
+
+function follow(agent: Agent): void {
+  followed[agent.team] = agent.id;
+  refresh();
+}
+
+function clearFollowed(): void {
+  followed.blue = null;
+  followed.red = null;
+  refresh();
 }
 
 function buildSquadPanels(): void {
@@ -119,9 +173,13 @@ function buildSquadPanels(): void {
       const row = document.createElement('div');
       row.className = 'slot';
 
-      const badge = document.createElement('span');
+      const badge = document.createElement('button');
+      badge.type = 'button';
       badge.className = 'slot-id';
       badge.textContent = String(slot + 1);
+      badge.dataset.testid = `pick-${team}-${slot}`;
+      badge.setAttribute('aria-label', `Follow ${team} agent ${slot + 1}`);
+      badge.addEventListener('click', () => follow(world.agents[agentId]));
 
       const select = document.createElement('select');
       select.dataset.testid = `brain-${team}-${slot}`;
@@ -137,6 +195,7 @@ function buildSquadPanels(): void {
       state.className = 'slot-state';
       state.dataset.testid = `state-${team}-${slot}`;
       slotStates.set(agentId, state);
+      slotRows.set(agentId, row);
 
       row.append(badge, select, state);
       panel.append(row);
@@ -161,10 +220,19 @@ function frame(now: number): void {
       if (world.winner) startCountdown();
     }
   }
-  renderWorld(ctx, world, running ? carry : 0, art);
+  renderWorld(ctx, world, running ? carry : 0, art, TEAMS.flatMap((t) => (followed[t] === null ? [] : [followed[t]!])));
   showCountdown();
   requestAnimationFrame(frame);
 }
+
+canvas.addEventListener('click', (e) => {
+  const box = canvas.getBoundingClientRect();
+  const x = ((e.clientX - box.left) / box.width) * world.map.width;
+  const y = ((e.clientY - box.top) / box.height) * world.map.height;
+  const agent = agentAt(world, x, y, running ? carry : 0);
+  if (agent) follow(agent);
+  else clearFollowed();
+});
 
 playButton.addEventListener('click', () => {
   if (running || countdown > 0) setRunning(false);
@@ -196,6 +264,7 @@ requestAnimationFrame(frame);
 const hook = {
   tick: () => world.tick,
   hash: () => stateHash(world),
+  agentOnCanvas: (id: number) => agentOnCanvas(world, world.agents[id], 0),
   advance: (ticks: number) => {
     setRunning(false);
     advance(ticks);

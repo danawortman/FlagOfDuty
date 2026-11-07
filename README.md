@@ -13,6 +13,9 @@ npm run dev
 
 Then open http://localhost:5199.
 
+Click an agent, or its number in the squad, to follow it: its team's panel shows its brain and
+states, with the active state highlighted. Click empty ground to stop following.
+
 ## Rules
 
 - First to 3 captures wins. After 3 minutes (1800 ticks) the leader wins, or it is a draw.
@@ -59,7 +62,7 @@ Any exact moment can be loaded from the URL, which keeps screenshots determinist
 /?seed=7&blue=raider,rusher,sentry,shadow,picket&red=picket,rusher,sentry,goalkeeper,raider&tick=240&arena=1
 ```
 
-Playwright starts its own server on port 5198 and never reuses one, so a dev server left
+Playwright starts its own server on port 5191 and never reuses one, so a dev server left
 open elsewhere cannot be tested by mistake. It fails if that port is busy.
 
 Screenshot baselines are not included, because text renders differently on each OS. Generate

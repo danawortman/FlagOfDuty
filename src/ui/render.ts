@@ -25,6 +25,7 @@ const COLORS = {
   blue: '#4c9bff',
   red: '#ff6b5e',
   outline: '#0d1117',
+  selected: '#ffd166',
   number: '#f4f6fa',
 };
 
@@ -264,6 +265,38 @@ function numberShift(art: Art, agent: Agent): { x: number; y: number } {
   return { x: -Math.sin(angle) * back, y: Math.cos(angle) * back + 1 };
 }
 
+function drawRing(ctx: CanvasRenderingContext2D, agent: Agent, alpha: number): void {
+  if (agent.respawn > 0) return;
+  const at = agentPosition(agent, alpha);
+  ctx.beginPath();
+  ctx.arc((at.x + 0.5) * TILE, (at.y + 0.5) * TILE, TILE * 0.66, 0, Math.PI * 2);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = COLORS.selected;
+  ctx.stroke();
+}
+
+// The agent drawn nearest to a point, in tiles, if one is close enough to count as clicked.
+export function agentAt(world: World, x: number, y: number, alpha: number): Agent | null {
+  let best: Agent | null = null;
+  let bestDistance = 0.6;
+  for (const agent of world.agents) {
+    if (agent.respawn > 0) continue;
+    const at = agentPosition(agent, alpha);
+    const distance = Math.hypot(at.x + 0.5 - x, at.y + 0.5 - y);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = agent;
+    }
+  }
+  return best;
+}
+
+// Where an agent is drawn, as fractions of the arena's width and height.
+export function agentOnCanvas(world: World, agent: Agent, alpha: number): { x: number; y: number } {
+  const at = agentPosition(agent, alpha);
+  return { x: (at.x + 0.5) / world.map.width, y: (at.y + 0.5) / world.map.height };
+}
+
 function drawAgent(ctx: CanvasRenderingContext2D, world: World, agent: Agent, alpha: number, art: Art): void {
   if (agent.respawn > 0) return;
   const at = agentPosition(agent, alpha);
@@ -301,7 +334,13 @@ function drawAgent(ctx: CanvasRenderingContext2D, world: World, agent: Agent, al
 }
 
 // The arena is drawn once the sprites have loaded.
-export function renderWorld(ctx: CanvasRenderingContext2D, world: World, alpha: number, art: Art | null): void {
+export function renderWorld(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  alpha: number,
+  art: Art | null,
+  selected: number[] = [],
+): void {
   if (!art) {
     ctx.fillStyle = COLORS.verge;
     ctx.fillRect(0, 0, world.map.width * TILE, world.map.height * TILE);
@@ -314,5 +353,6 @@ export function renderWorld(ctx: CanvasRenderingContext2D, world: World, alpha: 
       drawFlagGlyph(ctx, team, (flag.pos.x + 0.42) * TILE, (flag.pos.y + 0.62) * TILE, 28);
     }
   }
+  for (const id of selected) drawRing(ctx, world.agents[id], alpha);
   for (const agent of world.agents) drawAgent(ctx, world, agent, alpha, art);
 }
